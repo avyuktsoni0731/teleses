@@ -21,12 +21,11 @@ const getToken = async (code) => {
   return tokens;
 };
 
-const getLinkedInEmails = async (tokens) => {
+const getAllEmails = async (tokens) => {
   oauth2Client.setCredentials(tokens);
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
   const res = await gmail.users.messages.list({
     userId: 'me',
-    q: 'from:linkedin.com',
   });
 
   const messages = res.data.messages || [];
@@ -43,4 +42,5 @@ const getLinkedInEmails = async (tokens) => {
   return emails;
 };
 
-module.exports = { generateAuthUrl, getToken, getLinkedInEmails };
+
+module.exports = { generateAuthUrl, getToken, getAllEmails };

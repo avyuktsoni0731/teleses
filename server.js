@@ -26,7 +26,7 @@ app.get('/oauth2callback', async (req, res) => {
 
 app.get('/emails', async (req, res) => {
   const tokens = JSON.parse(req.headers.authorization.replace('Bearer ', ''));
-  const emails = await getLinkedInEmails(tokens);
+  const emails = await getAllEmails(tokens);
   res.json(emails);
 });
 

@@ -14,13 +14,32 @@ function App() {
 
   const fetchEmails = async () => {
     const tokens = JSON.parse(localStorage.getItem('tokens'));
-    const response = await fetch('http://localhost:5000/emails', {
-      headers: {
-        Authorization: `Bearer ${tokens.access_token}`,
-      },
-    });
-    const data = await response.json();
-    setEmails(data);
+    if (tokens && tokens.access_token) {
+      const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages', {
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.messages) {
+        const emailPromises = data.messages.map(async (message) => {
+          const msgResponse = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${tokens.access_token}`,
+              },
+            }
+          );
+          const msgData = await msgResponse.json();
+          return msgData.snippet;
+        });
+        const emailSnippets = await Promise.all(emailPromises);
+        setEmails(emailSnippets);
+      } else {
+        setEmails([]);
+      }
+    }
   };
 
   return (
