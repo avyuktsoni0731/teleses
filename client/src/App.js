@@ -1,99 +1,73 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 
 function App() {
   const [emails, setEmails] = useState([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const tokens = urlParams.get('tokens');
+    const tokens = urlParams.get("tokens");
     if (tokens) {
-      localStorage.setItem('tokens', tokens);
-      window.location.search = '';
+      localStorage.setItem("tokens", tokens);
+      window.location.search = "";
     }
   }, []);
 
   const fetchEmails = async () => {
-    const tokens = JSON.parse(localStorage.getItem('tokens'));
-    const response = await fetch('http://localhost:5000/emails', {
-      headers: {
-        Authorization: `Bearer ${tokens.access_token}`,
-      },
-    });
-    const data = await response.json();
-    setEmails(data);
-  };
-
-  return (
-    <div>
-      <h1>LinkedIn Emails</h1>
-      <button onClick={() => (window.location.href = 'http://localhost:5000/auth')}>
-        Authenticate with Google
-      </button>
-      <button onClick={fetchEmails}>Fetch Emails</button>
-      <ul>
-        {emails.map((email, index) => (
-          <li key={index}>{email}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-export default App;
-import React, { useEffect, useState } from 'react';
-
-function App() {
-  const [emails, setEmails] = useState([]);
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokens = urlParams.get('tokens');
+    const tokens = localStorage.getItem("tokens");
     if (tokens) {
-      localStorage.setItem('tokens', tokens);
-      window.location.search = '';
-    }
-  }, []);
-
-  const fetchEmails = async () => {
-    const tokens = JSON.parse(localStorage.getItem('tokens'));
-    if (tokens && tokens.access_token) {
-      const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages', {
-        headers: {
-          Authorization: `Bearer ${tokens.access_token}`,
-        },
-      });
-      const data = await response.json();
-      if (data.messages) {
-        const emailPromises = data.messages.map(async (message) => {
-          const msgResponse = await fetch(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${tokens.access_token}`,
-              },
-            }
-          );
-          const msgData = await msgResponse.json();
-          return msgData.snippet;
+      try {
+        const response = await fetch("http://localhost:5000/emails", {
+          headers: {
+            Authorization: `Bearer ${tokens}`,
+          },
         });
-        const emailSnippets = await Promise.all(emailPromises);
-        setEmails(emailSnippets);
-      } else {
-        setEmails([]);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to fetch emails");
+        }
+        const emails = await response.json();
+        setEmails(emails);
+      } catch (error) {
+        setError(error.message);
       }
+    } else {
+      setError("No tokens found");
     }
+  };
+
+  const parseEmailBody = (payload) => {
+    let body = "";
+    if (payload.parts) {
+      payload.parts.forEach((part) => {
+        if (part.mimeType === "text/html") {
+          body += atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+        } else if (part.parts) {
+          body += parseEmailBody(part);
+        }
+      });
+    } else {
+      body += atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+    }
+    return body;
   };
 
   return (
     <div>
-      <h1>LinkedIn Emails</h1>
-      <button onClick={() => (window.location.href = 'http://localhost:5000/auth')}>
+      <h1>Gmail Emails</h1>
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      <button
+        onClick={() => (window.location.href = "http://localhost:5000/auth")}
+      >
         Authenticate with Google
       </button>
       <button onClick={fetchEmails}>Fetch Emails</button>
       <ul>
         {emails.map((email, index) => (
-          <li key={index}>{email}</li>
+          <li
+            key={index}
+            dangerouslySetInnerHTML={{ __html: parseEmailBody(email.payload) }}
+          />
         ))}
       </ul>
     </div>
